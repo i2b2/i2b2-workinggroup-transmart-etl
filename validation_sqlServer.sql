@@ -599,4 +599,3 @@ group by   case when age < 0 then concat(years, ' - ', 'Under 0 second' )
 ) [analysis 14 - Queries year runtime breakdown]
 
 
-select DATEDIFF(ms, start_date, end_date) as age, YEAR(start_date) as years from qt_query_instance where batch_mode = 'FINISHED'
