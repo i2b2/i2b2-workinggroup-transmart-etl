@@ -1,7 +1,7 @@
 
 
 
-CREATE PROCEDURE [dbo].[Lz_src_nextgen_omop_person]
+create or alter PROCEDURE [dbo].[wz_src_nextgen_omop_person]
 AS
   BEGIN
       IF EXISTS (SELECT 1
@@ -33,20 +33,8 @@ AS
       WHERE  s.person_id = e.person_id
       GROUP  BY s.person_id
 
-      IF EXISTS (SELECT 1
-                 FROM   sysobjects
-                 WHERE  xtype = 'u'
-                        AND NAME = 'tmp_nextgen_patient_death')
-        DROP TABLE tmp_nextgen_patient_death
-
-      SELECT p.person_id,
-             p.expired_date
-      INTO   tmp_nextgen_patient_death
-      FROM   lz_src..person p
-      WHERE  expired_ind = 'Y'
-
       INSERT INTO person
-                  (person_id,
+                  (
                    gender_concept_id,
                    year_of_birth,
                    month_of_birth,
@@ -65,32 +53,35 @@ AS
                    race_source_concept_id,
                    ethnicity_source_value,
                    ethnicity_source_concept_id)
-      SELECT a.other_id_number AS mrn,
+      SELECT
              CASE Upper(a.sex)
                WHEN 'M' THEN 8507
                WHEN 'F' THEN 8532
+			   ELSE 0
              END,
              Substring(a.date_of_birth, 1, 4),
-             Substring(a.date_of_birth, 4, 2),
-             Substring(a.date_of_birth, 6, 2),
+             Substring(a.date_of_birth, 5, 2),
+             Substring(a.date_of_birth, 7, 2),
              date_of_birth,
              CASE
-               WHEN Isdate(d.expired_date) = 1 THEN d.expired_date
+               WHEN (a.expired_ind) = 'Y' THEN a.expired_date
              END               AS death_date,
-             CASE Upper(r.race)
-               WHEN 'WHITE' THEN 8527
-               WHEN 'BLACK' THEN 8516
-               WHEN 'ASIAN' THEN 8515
+             CASE lower(r.race)
+               WHEN 'caucasian' THEN 8527
+			   WHEN 'white' THEN 8527
+               WHEN 'african american' THEN 8516
+               WHEN 'black or african american' THEN 8516
+               WHEN 'asian' THEN 8515
                ELSE 0
              END,
              CASE
-               WHEN Upper(a.ethnicity) = 'HISPANIC' THEN 38003563
+               WHEN lower(a.ethnicity) = 'hispanic or latino' THEN 38003563
                ELSE 0
              END,
              NULL,
              NULL,
              NULL,
-             a.other_id_number,
+             pt.med_rec_nbr,
              a.sex,
              0,
              a.race,
@@ -102,11 +93,12 @@ AS
                ON a.person_id = pt.person_id
              JOIN tmp_nextgen_patient e
                ON a.person_id = e.person_id
-             LEFT JOIN tmp_nextgen_patient_death d
-                    ON d.person_id = a.person_id
              LEFT JOIN tmp_nextgen_race_status r
                     ON r.person_id = a.person_id
+
   END  
+  
+  
   
   
    CREATE PROCEDURE [dbo].[Lz_src_nextgen_omop_diagnosis]
