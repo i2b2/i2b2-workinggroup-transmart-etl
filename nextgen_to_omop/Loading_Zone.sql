@@ -1,3 +1,185 @@
+
+
+
+CREATE PROCEDURE [dbo].[Lz_src_nextgen_omop_vocabulary]
+AS
+  BEGIN
+
+INSERT INTO concept
+           (concept_name
+           ,domain_id
+           ,vocabulary_id
+           ,concept_class_id
+           ,standard_concept
+           ,concept_code
+           ,valid_start_date
+           ,valid_end_date
+           ,invalid_reason)
+
+
+select substring(c_name, 0,255), 'DIAGNOSIS',  'ICD10CM', '@', null, c_basecode,  '1/1/1970', '12/31/2099', null
+from i2b2data..ACT_ICD10CM_DX_2018AA
+where c_name is not null
+and c_basecode is not null
+and c_basecode != ''
+
+UNION
+
+select substring(c_name, 0,255), 'PROCEDURE',  'CPT4', '@', null, c_basecode,  '1/1/1970', '12/31/2099', null
+from i2b2data..ACT_CPT_PX_2018AA
+where c_name is not null
+and c_basecode is not null
+and c_basecode != ''
+
+UNION
+
+select substring(c_name, 0,255), 'PROCEDURE',  'ICD10PCS', '@', null, c_basecode,  '1/1/1970', '12/31/2099', null
+from i2b2data..ACT_ICD10PCS_PX_2018AA
+where c_name is not null
+and c_basecode is not null
+and c_basecode != ''
+
+UNION
+
+select substring(c_name, 0,255), 'PROCEDURE',  'ICD9', '@', null, c_basecode,  '1/1/1970', '12/31/2099', null
+from i2b2data..ACT_ICD9PCS_PX_2018AA
+where c_name is not null
+and c_basecode is not null
+and c_basecode != ''
+
+UNION
+
+select substring(c_name, 0,255), 'PROCEDURE',  'HCPCS', '@', null, c_basecode,  '1/1/1970', '12/31/2099', null
+from i2b2data..ACT_HCPCS_PX_2018AA
+where c_name is not null
+and c_basecode is not null
+and c_basecode != ''
+
+UNION
+
+select substring(c_name, 0,255), 'DIAGNOSIS',  'ICD9CM', '@', null, c_basecode,  '1/1/1970', '12/31/2099', null
+from i2b2data..ACT_ICD9CM_DX_2018AA
+where c_name is not null
+and c_basecode is not null
+and c_basecode != ''
+
+UNION
+
+select substring(c_name, 0,255), 'MEDICATION',  'NDC', '@', null, c_basecode,  '1/1/1970', '12/31/2099', null
+from i2b2data..ACT_MED_ALPHA_V2_092818
+where c_name is not null
+and c_basecode is not null
+and c_basecode != ''
+and c_basecode like 'NDC%'
+
+UNION
+
+select substring(c_name, 0,255), 'MEDICATION',  'RXNORM', '@', null, c_basecode,  '1/1/1970', '12/31/2099', null
+from i2b2data..ACT_MED_ALPHA_V2_092818
+where c_name is not null
+and c_basecode is not null
+and c_basecode != ''
+and c_basecode like 'RXNORM%'
+
+UNION
+
+select substring(c_name, 0,255), 'LAB',  'LOINC', '@', null, c_basecode,  '1/1/1970', '12/31/2099', null
+from i2b2data..ACT_LOINC_LAB_2018AA
+where c_name is not null
+and c_basecode is not null
+and c_basecode != ''
+
+GO
+
+
+INSERT INTO domain
+           (domain_id
+           ,domain_name
+           ,domain_concept_id)
+		   select domain_id, lower(domain_id), concept_id
+		   from concept
+GO
+
+
+INSERT INTO vocabulary
+           (vocabulary_id
+           ,vocabulary_name
+           ,vocabulary_reference
+           ,vocabulary_version
+           ,vocabulary_concept_id)
+     select 'ICD10CM',
+           'International Classification of Diseases, Tenth Revision, Clinical Modification',
+		   'https://www.cdc.gov/nchs/icd/icd10cm.htm',
+		   '2018AA',
+		   concept_id
+	from concept where vocabulary_id = 'ICD10CM'
+union
+     select 'ICD9CM',
+           'International Classification of Diseases, Ninth Revision, Clinical Modification',
+		   'https://www.cdc.gov/nchs/icd/icd9cm.htm',
+		   '2018AA',
+		   concept_id
+	from concept where vocabulary_id = 'ICD9CM'
+union
+     select 'ICD10PCS',
+           'International Classification of Diseases, Tenth Revision,  Procedure Coding System',
+		   'https://www.cdc.gov/nchs/icd/icd10.htm',
+		   '2018AA',
+		   concept_id
+	from concept where vocabulary_id = 'ICD10PCS'
+union
+     select 'ICD9PCS',
+           'International Classification of Diseases, Ninth Revision,  Procedure Coding System',
+		   'https://www.cdc.gov/nchs/icd/icd9.htm',
+		   '2018AA',
+		   concept_id
+	from concept where vocabulary_id = 'ICD9PCS'
+
+
+union
+     select 'CPT',
+           'Current Procedural Terminology Version 4',
+		   'https://www.ama-assn.org/amaone/cpt-current-procedural-terminology',
+		   '2018AA',
+		   concept_id
+	from concept where vocabulary_id = 'CPT4'
+
+
+union
+     select 'HCPCS',
+           'The Healthcare Common Procedure Coding System',
+		   'https://www.cms.gov/Medicare/Coding/MedHCPCSGenInfo/index',
+		   '2018AA',
+		   concept_id
+	from concept where vocabulary_id = 'HCPCS'
+
+
+union
+     select 'LOINC',
+           'Logical Observation Identifiers Names and Codes',
+		   'https://loinc.org/',
+		   '2.66',
+		   concept_id
+	from concept where vocabulary_id = 'LOINC'
+
+union
+     select 'NDC',
+           'National Drug Code',
+		   'https://www.fda.gov/drugs/drug-approvals-and-databases/national-drug-code-directory',
+		   '2018AA',
+		   concept_id
+	from concept where vocabulary_id = 'NDC'
+
+union
+     select 'RXNORM',
+           'RxNorm',
+		   'https://www.nlm.nih.gov/research/umls/rxnorm/index.html',
+		   '2018AA',
+		   concept_id
+	from concept where vocabulary_id = 'RXNORM'
+end
+ 
+ 
  CREATE PROCEDURE [dbo].[Lz_src_nextgen_omop_provider]
 AS
   BEGIN
