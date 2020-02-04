@@ -1,5 +1,5 @@
 
-create or alter  PROCEDURE [dbo].[wz_src_nextgen_omop_care_site]
+create    PROCEDURE [dbo].[wz_src_nextgen_omop_care_site]
 AS
   BEGIN
 INSERT INTO location
@@ -50,8 +50,7 @@ END
 GO
 
 
-
-   CREATE  or alter   PROCEDURE [dbo].[wz_src_nextgen_omop_diagnosis]
+   CREATE      PROCEDURE [dbo].[wz_src_nextgen_omop_diagnosis]
 AS
   BEGIN
     IF EXISTS
@@ -97,7 +96,7 @@ INSERT INTO observation
 						value_as_datetime
             )
 SELECT    
-           p.person_nbr AS patient_id,
+           ps.person_id AS patient_id,
 		    c.concept_id,
 		   NULL,
            CASE
@@ -129,6 +128,8 @@ ON         e.person_id=a.person_id
 AND        e.enc_id=a.enc_id
 JOIN       lz_src..lz_nextgen_person p
 ON         p.person_id=a.person_id
+JOIN		person ps
+on		ps.person_source_value = p.person_nbr
 INNER JOIN lz_src..lz_nextgen_icd9cm_code_mstr e9
 ON         a.icd9cm_code_id=e9.icd9cm_code_id
 JOIN	concept c
@@ -143,7 +144,6 @@ where e9.icd9cm_code_id is not null
 
 INSERT INTO visit_detail
             (
-                        visit_detail_id ,
                         person_id ,
                         visit_detail_concept_id ,
                         visit_detail_start_date ,
@@ -163,33 +163,30 @@ INSERT INTO visit_detail
                         visit_detail_parent_id ,
                         visit_occurrence_id
             )
-SELECT  
-el.enc_nbr    AS encounter_id,
-         Max(e.person_nbr) AS patient_id,
+SELECT 
+         e.person_nbr AS patient_id,
          0,
          NULL,
-         Min(
          CASE
                   WHEN el.admit_date IS NOT NULL THEN el.admit_date
                   ELSE el.enc_timestamp
-         END) AS encounter_start_date,
+         END AS encounter_start_date,
          NULL,
-         Max(
          CASE
                   WHEN el.discharge_date IS NOT NULL THEN el.discharge_date
                   ELSE el.enc_timestamp
-         END) AS encounter_end_date,
+         END AS encounter_end_date,
          0,
-         1,
+         pr.provider_id,
          l.care_site_id,
          0,
-         3,
-         4,
-         NULL,
+         0,
+         0,
+         el.enc_status,
          0 ,
          NULL,
          NULL,
-         NULL,
+         el.enc_nbr,
 		 0
 FROM     lz_src..lz_nextgen_patient_encounter el
 JOIN       tmp_nextgen_diagnosis_encounter e
@@ -197,13 +194,16 @@ ON         e.person_id=el.person_id
 and		   e.enc_id=el.enc_id
 JOIN       care_site l
 ON         l.care_site_source_value=el.location_id
-GROUP BY el.enc_nbr, l.care_site_id
+JOIN	provider pr
+on		el.rendering_provider_id = pr.provider_source_value
+
 
 END
 GO
 
 
- CREATE   or alter     PROCEDURE [dbo].[wz_src_nextgen_omop_lab]
+
+ CREATE         PROCEDURE [dbo].[wz_src_nextgen_omop_lab]
 AS
   BEGIN
     IF EXISTS
@@ -245,7 +245,7 @@ INSERT INTO measurement
            ,measurement_source_concept_id
            ,unit_source_value
            ,value_source_value)
-    select distinct p.person_nbr,
+    select distinct ps.person_id,
           c.concept_id,
 		  null,
 		  --case when  r.coll_date_time is null then a.create_timestamp
@@ -276,6 +276,8 @@ JOIN       tmp_nextgen_lab_encounter e
 ON         e.person_id=a.person_id
 JOIN       lz_src..lz_nextgen_person p
 ON         p.person_id=a.person_id
+JOIN		person ps
+on		ps.person_source_value = p.person_nbr
 left join lz_src..lz_nextgen_lab_results_obr_p r on r.unique_obr_num=a.unique_obr_num
  join	   lz_src..labcorp_to_loinc l
 on			l.obs_batt_id = r.obs_batt_id
@@ -290,7 +292,6 @@ and a.obx_seq_num = 1
 
 INSERT INTO visit_detail
             (
-                        visit_detail_id ,
                         person_id ,
                         visit_detail_concept_id ,
                         visit_detail_start_date ,
@@ -310,48 +311,47 @@ INSERT INTO visit_detail
                         visit_detail_parent_id ,
                         visit_occurrence_id
             )
-SELECT  
-el.enc_nbr    AS encounter_id,
-         Max(e.person_nbr) AS patient_id,
+SELECT 
+         e.person_nbr AS patient_id,
          0,
          NULL,
-         Min(
          CASE
                   WHEN el.admit_date IS NOT NULL THEN el.admit_date
                   ELSE el.enc_timestamp
-         END) AS encounter_start_date,
+         END AS encounter_start_date,
          NULL,
-         Max(
          CASE
                   WHEN el.discharge_date IS NOT NULL THEN el.discharge_date
                   ELSE el.enc_timestamp
-         END) AS encounter_end_date,
+         END AS encounter_end_date,
          0,
-         1,
+         pr.provider_id,
          l.care_site_id,
          0,
-         3,
-         4,
-         NULL,
+         0,
+         0,
+         el.enc_status,
          0 ,
          NULL,
          NULL,
-         NULL,
+         el.enc_nbr,
 		 0
 FROM     lz_src..lz_nextgen_patient_encounter el
-JOIN       tmp_nextgen_diagnosis_encounter e
+JOIN       tmp_nextgen_lab_encounter e
 ON         e.person_id=el.person_id
 and		   e.enc_id=el.enc_id
 JOIN       care_site l
 ON         l.care_site_source_value=el.location_id
-GROUP BY el.enc_nbr, l.care_site_id
+JOIN	provider pr
+on		el.rendering_provider_id = pr.provider_source_value
 
 END
 
 GO
 
 
- create   or alter     PROCEDURE [dbo].[wz_src_nextgen_omop_medication]
+
+ create         PROCEDURE [dbo].[wz_src_nextgen_omop_medication]
 AS
   BEGIN
     IF EXISTS
@@ -396,7 +396,7 @@ INSERT INTO drug_exposure
            ,route_source_value
            ,dose_unit_source_value)
 select
-			p.person_nbr,
+			ps.person_id,
 			0,
 			null,
 			a.create_timestamp,
@@ -427,10 +427,12 @@ ON         e.person_id=a.person_id
 AND        e.enc_id=a.enc_id
 JOIN       lz_src..lz_nextgen_person p
 ON         p.person_id=a.person_id
+JOIN		person ps
+on		ps.person_source_value = p.person_nbr
+
 
 INSERT INTO visit_detail
             (
-                        visit_detail_id ,
                         person_id ,
                         visit_detail_concept_id ,
                         visit_detail_start_date ,
@@ -450,48 +452,47 @@ INSERT INTO visit_detail
                         visit_detail_parent_id ,
                         visit_occurrence_id
             )
-SELECT  
-el.enc_nbr    AS encounter_id,
-         Max(e.person_nbr) AS patient_id,
+SELECT 
+         e.person_nbr AS patient_id,
          0,
          NULL,
-         Min(
          CASE
                   WHEN el.admit_date IS NOT NULL THEN el.admit_date
                   ELSE el.enc_timestamp
-         END) AS encounter_start_date,
+         END AS encounter_start_date,
          NULL,
-         Max(
          CASE
                   WHEN el.discharge_date IS NOT NULL THEN el.discharge_date
                   ELSE el.enc_timestamp
-         END) AS encounter_end_date,
+         END AS encounter_end_date,
          0,
-         1,
+         pr.provider_id,
          l.care_site_id,
          0,
-         3,
-         4,
-         NULL,
+         0,
+         0,
+         el.enc_status,
          0 ,
          NULL,
          NULL,
-         NULL,
+         el.enc_nbr,
 		 0
 FROM     lz_src..lz_nextgen_patient_encounter el
-JOIN       tmp_nextgen_diagnosis_encounter e
+JOIN       tmp_nextgen_medication_encounter e
 ON         e.person_id=el.person_id
 and		   e.enc_id=el.enc_id
 JOIN       care_site l
 ON         l.care_site_source_value=el.location_id
-GROUP BY el.enc_nbr, l.care_site_id
+JOIN	provider pr
+on		el.rendering_provider_id = pr.provider_source_value
 
 END
 
 GO
 
 
-CREATE  or alter   PROCEDURE [dbo].[wz_src_nextgen_omop_person]
+
+CREATE      PROCEDURE [dbo].[wz_src_nextgen_omop_person]
 AS
   BEGIN
       IF EXISTS (SELECT 1
@@ -595,7 +596,7 @@ GO
 
 
 
-   CREATE  or alter   PROCEDURE [dbo].[wz_src_nextgen_omop_procedure]
+   CREATE      PROCEDURE [dbo].[wz_src_nextgen_omop_procedure]
 AS
   BEGIN
     IF EXISTS
@@ -641,7 +642,7 @@ INSERT INTO observation
 						value_as_datetime
             )
 SELECT    
-           p.person_nbr AS patient_id,
+           ps.person_id AS patient_id,
 		   c.concept_id,
 		   NULL,
            CASE
@@ -671,6 +672,8 @@ ON         e.person_id=a.person_id
 AND        e.enc_id=a.enc_id
 JOIN       lz_src..lz_nextgen_person p
 ON         p.person_id=a.person_id
+JOIN		person ps
+on		ps.person_source_value = p.person_nbr
 JOIN	concept c
 on		concat('CPT4:', a.cpt4_code_id) = c.concept_code
 JOIN	provider pr
@@ -708,7 +711,7 @@ set @sql = N'INSERT INTO observation
 						value_as_datetime
             )
 SELECT    
-           p.person_nbr AS patient_id,
+           ps.person_id AS patient_id,
 		   c.concept_id,
 		   NULL,
            CASE
@@ -740,6 +743,8 @@ ON         e.person_id=a.person_id
 AND        e.enc_id=a.enc_id
 JOIN       lz_src..lz_nextgen_person p
 ON         p.person_id=a.person_id
+JOIN		person ps
+on		ps.person_source_value = p.person_nbr
 INNER JOIN lz_src..lz_nextgen_icd9cm_code_mstr e9
 ON        ' + @cpt + ' = e9.icd9cm_code_id
 JOIN	concept c
@@ -759,7 +764,6 @@ end
 
 INSERT INTO visit_detail
             (
-                        visit_detail_id ,
                         person_id ,
                         visit_detail_concept_id ,
                         visit_detail_start_date ,
@@ -779,33 +783,30 @@ INSERT INTO visit_detail
                         visit_detail_parent_id ,
                         visit_occurrence_id
             )
-SELECT  
-el.enc_nbr    AS encounter_id,
-         Max(e.person_nbr) AS patient_id,
+SELECT 
+         e.person_nbr AS patient_id,
          0,
          NULL,
-         Min(
          CASE
                   WHEN el.admit_date IS NOT NULL THEN el.admit_date
                   ELSE el.enc_timestamp
-         END) AS encounter_start_date,
+         END AS encounter_start_date,
          NULL,
-         Max(
          CASE
                   WHEN el.discharge_date IS NOT NULL THEN el.discharge_date
                   ELSE el.enc_timestamp
-         END) AS encounter_end_date,
+         END AS encounter_end_date,
          0,
-         1,
+         pr.provider_id,
          l.care_site_id,
          0,
-         3,
-         4,
-         NULL,
+         0,
+         0,
+         el.enc_status,
          0 ,
          NULL,
          NULL,
-         NULL,
+         el.enc_nbr,
 		 0
 FROM     lz_src..lz_nextgen_patient_encounter el
 JOIN       tmp_nextgen_procedure_encounter e
@@ -813,13 +814,14 @@ ON         e.person_id=el.person_id
 and		   e.enc_id=el.enc_id
 JOIN       care_site l
 ON         l.care_site_source_value=el.location_id
-GROUP BY el.enc_nbr, l.care_site_id
+JOIN	provider pr
+on		el.rendering_provider_id = pr.provider_source_value
 
 END
 GO
 
 
-  CREATE  or alter  PROCEDURE [dbo].[wz_src_nextgen_omop_provider]
+  CREATE     PROCEDURE [dbo].[wz_src_nextgen_omop_provider]
 AS
   BEGIN
       INSERT INTO provider
@@ -845,11 +847,14 @@ AS
              NULL,
              0,
              a.provider_id,
-             NULL,
+             m.mstr_list_item_desc,
              0,
             NULL,
              0          
-      FROM   lz_src..provider_mstr a
+      FROM   lz_src..lz_nextgen_provider_mstr a
+	  left  join	lz_src..lz_nextgen_mstr_lists m
+	  on a.provider_subgrouping1_id = m.mstr_list_item_id
+      
   END  
  
 GO
